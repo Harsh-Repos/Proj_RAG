@@ -15,6 +15,7 @@
    - [state.py](#graph-statepy)
    - [llm.py](#graph-llmpy)
    - [metadata_filters.py](#graph-metadata_filterspy)
+   - [prompts.py](#graphpromptspy)
    - [nodes.py](#graph-nodespy)
    - [routing.py](#graph-routingpy)
    - [workflow.py](#graph-workflowpy)
@@ -1815,6 +1816,50 @@ def get_llm() -> ChatGroq:
 
 ---
 
+## graph/prompts.py
+
+### What This File Does
+Holds every LLM prompt and the fixed reply texts in one place, so `nodes.py` only contains logic.
+To change how the LLM behaves, edit this file only.
+
+### Contents
+
+```python
+from langchain_core.prompts import ChatPromptTemplate
+
+NO_ANSWER = "I don't know based on the provided project repository."
+#   Reply when the question IS about the projects but the context lacks the information
+
+OUT_OF_SCOPE_ANSWER = "This question is not related to the project repository, ..."
+#   Reply when the question is NOT about the projects (weather, news, coding help, ...)
+#   Also imported by ui/app.py, which shows it in an info box and hides the sources
+
+REPOSITORY_DESCRIPTION = "The repository describes about 100 projects. Each project has: ..."
+#   Shared description inserted into every prompt with an f-string
+
+QUERY_ANALYSIS_PROMPT   # used by analyze_query  -> search_query + conditions (QueryAnalysis)
+REFINE_QUERY_PROMPT     # used by refine_query   -> better search query (retry only)
+ANSWER_PROMPT           # used by generate_answer -> answer from the context only
+VERIFICATION_PROMPT     # used by verify_answer  -> is_valid + feedback (9 checks)
+
+JSON_FALLBACK_INSTRUCTION = "Respond with ONLY a JSON object ... matches this JSON schema:\n{json_schema}"
+#   Appended only when strict JSON-schema output fails (see invoke_structured in nodes.py)
+```
+
+### How a prompt is built
+Each prompt is `ChatPromptTemplate.from_messages([("system", rules), ("human", data)])`:
+- **system** message = the job and the rules
+- **human** message = the data, with `{placeholders}` filled in by `.invoke({...})`
+
+| Prompt | Placeholders |
+|---|---|
+| QUERY_ANALYSIS_PROMPT | `{question}` |
+| REFINE_QUERY_PROMPT | `{question}`, `{search_query}`, `{feedback}` |
+| ANSWER_PROMPT | `{feedback_note}`, `{context}`, `{question}` |
+| VERIFICATION_PROMPT | `{context}`, `{question}`, `{answer}` |
+
+---
+
 ## graph/nodes.py
 
 ### What This File Does
@@ -1832,8 +1877,12 @@ from langchain_community.retrievers import BM25Retriever  # Keyword search
 from langchain_community.vectorstores import FAISS  # Semantic search
 from langchain_core.documents import Document  # Document class
 from langchain_core.output_parsers import StrOutputParser  # Parse string output
-from langchain_core.prompts import ChatPromptTemplate  # Prompt template
+from langchain_core.prompts import ChatPromptTemplate  # Type hint for invoke_structured
 from pydantic import BaseModel, Field  # For structured output
+from graph.prompts import (  # All prompts live in graph/prompts.py
+    ANSWER_PROMPT, JSON_FALLBACK_INSTRUCTION, QUERY_ANALYSIS_PROMPT,
+    REFINE_QUERY_PROMPT, VERIFICATION_PROMPT,
+)
 
 # Load indexes and caches
 @lru_cache(maxsize=1)
@@ -1858,18 +1907,38 @@ def get_project_metadata() -> list[dict]:
 
 ### Prompts
 
-The file contains several ChatPromptTemplate objects (QUERY_ANALYSIS_PROMPT, ANSWER_PROMPT, VERIFICATION_PROMPT, REFINE_QUERY_PROMPT). Each is a template with {placeholders} for variables.
+The prompts are not defined here any more; they are imported from `graph/prompts.py` (see above).
+
+### invoke_structured(): reliable structured output
+
+```python
+def invoke_structured(prompt, schema, inputs) -> BaseModel:
+    llm = get_llm()
+    strict_chain = prompt | llm.with_structured_output(schema, method="json_schema", strict=True)
+    json_mode_chain = (prompt + [("human", JSON_FALLBACK_INSTRUCTION)]) | llm.with_structured_output(
+        schema, method="json_mode"
+    )
+    fallback_inputs = {**inputs, "json_schema": json.dumps(schema.model_json_schema())}
+    try:
+        return strict_chain.invoke(inputs)
+    except Exception:
+        return json_mode_chain.invoke(fallback_inputs)
+
+# Used by analyze_query (QueryAnalysis) and verify_answer (VerificationResult).
+# Try 1: Groq strict JSON-schema mode.
+# Why a fallback: gpt-oss sometimes replies with its reasoning ("We need to verify...
+#   All checks pass.") instead of JSON, and Groq rejects it with HTTP 400 output_parse_failed.
+# Try 2: plain JSON mode, with JSON_FALLBACK_INSTRUCTION + the schema added to the prompt.
+```
 
 ### The 7 Nodes
 
 ```python
 def analyze_query(state: RAGState) -> dict:
     question = state["question"]
-    analyzer = QUERY_ANALYSIS_PROMPT | get_llm().with_structured_output(QueryAnalysis)
+    analysis = invoke_structured(QUERY_ANALYSIS_PROMPT, QueryAnalysis, {"question": question})
     # What: chain = prompt -> LLM that must answer in the QueryAnalysis schema
-    # | = pipe operator (output of one step goes into the next)
-
-    analysis = analyzer.invoke({"question": question})
+    # (strict JSON first, plain JSON mode as fallback)
     # One LLM call. Returns a QueryAnalysis object, for example for
     # "atleast 5 members and duration was more then 3 months":
     #   analysis.search_query = "project team size duration ..."
@@ -1910,7 +1979,8 @@ import sys
 from pathlib import Path
 import streamlit as st
 from graph.metadata_filters import describe_filters
-from graph.nodes import get_keyword_retriever, get_project_metadata
+from graph.nodes import get_keyword_retriever, get_project_metadata, get_vector_store
+from graph.prompts import OUT_OF_SCOPE_ANSWER  # fixed off-topic reply, to hide sources for it
 from graph.workflow import build_graph
 from ingestion.database import DATABASE_PATH
 from ingestion.keyword_retriever import BM25_PATH
@@ -2132,9 +2202,10 @@ Each node:
 - All other operations deterministic (FAISS, BM25, SQL, Python comparisons)
 
 ### Pattern 4: Caching Everywhere
-- @lru_cache on embedding model
-- @lru_cache on vector store
-- @lru_cache on keyword retriever  
+- @lru_cache on vector store (the embedding model is loaded together with it)
+- @lru_cache on keyword retriever
+- @lru_cache on project metadata (SQLite rows) and technology names
+- @lru_cache on the Groq LLM (get_llm)
 - @st.cache_resource on graph load
 
 ---

@@ -204,17 +204,13 @@ Step 5b: Apply Metadata Filters
   ──────────────────────────────
   Filter extracted: technologies = ["Python", "Snowflake"], match = "all"
   
-  For each project in database:
+  For each of the 100 projects (loaded once from SQLite and cached):
     - If it uses both Python AND Snowflake → keep it
     - Otherwise → filter out
-  
-  Query SQLite:
-  ```
-  SELECT * FROM projects 
-  WHERE technology_stack LIKE '%Python%' 
-    AND technology_stack LIKE '%Snowflake%'
-  ```
-  
+
+  This comparison runs in Python (filter_projects_by_metadata), not as a SQL query:
+  the 100 rows are already in memory, so exact comparison is instant.
+
   Result: 17 projects match (P008, P010, P015, ..., P097)
   
   Store in: metadata_matches = [
@@ -223,14 +219,12 @@ Step 5b: Apply Metadata Filters
     ...
   ]
 
-Step 5c: Drop Chunks from Non-Matching Projects
-  ────────────────────────────────────────────
-  If metadata filters exist:
-    - Remove any chunk from projects NOT in metadata_matches
-    - Keep only chunks from the 17 matching projects
-  
-  Before filter: 10 chunks from various projects
-  After filter: 5 chunks from the 17 matching projects
+Step 5c: Retrieval Already Restricted to Matching Projects
+  ───────────────────────────────────────────────────────
+  If metadata filters exist, FAISS and BM25 searched ONLY the summary
+  chunks of the matching projects (up to 8 each), so no chunk has to be
+  dropped here. The full list of all 17 matches still goes into the prompt
+  as "PROJECTS MATCHING THE METADATA FILTERS".
 
 Output:
   - documents: [chunk1, chunk2, chunk3, ...] (filtered & de-duped)
@@ -457,6 +451,7 @@ Implement the RAG workflow with verification and retry logic.
 graph/
 ├── state.py                → RAGState (data model)
 ├── llm.py                  → Groq LLM setup
+├── prompts.py              → All LLM prompts + fixed replies (NO_ANSWER, OUT_OF_SCOPE_ANSWER)
 ├── nodes.py                → All 7 nodes
 ├── metadata_filters.py     → Filter extraction
 ├── routing.py              → Conditional routing
@@ -1420,9 +1415,10 @@ result = graph.invoke(state)
 # STEP 3: analyze_query node
 # Input: state (with question)
 # ONE LLM call returns a filled QueryAnalysis schema
-analyzer = QUERY_ANALYSIS_PROMPT | get_llm().with_structured_output(QueryAnalysis)
-analysis = analyzer.invoke({"question": question})
-search_query = analysis.search_query
+# invoke_structured() tries strict JSON-schema mode first and falls back to
+# plain JSON mode if Groq rejects the reply (HTTP 400 output_parse_failed)
+analysis = invoke_structured(QUERY_ANALYSIS_PROMPT, QueryAnalysis, {"question": question})
+search_query = keep_project_ids(clean_single_line(analysis.search_query) or question, question)
 # Output: "technology stack Python Snowflake"
 
 # Validate the conditions in Python
@@ -1442,23 +1438,31 @@ state.update({
 
 # STEP 4: semantic_retrieve and keyword_retrieve run IN PARALLEL
 
+# Both retrievers first ask which projects satisfy the conditions:
+allowed_ids = get_matching_project_ids(state["metadata_filters"])
+# None  → no conditions → search all ~200 chunks (k=5)
+# {...} → search ONLY the summary chunks of these projects (up to 8)
+
 # semantic_retrieve:
 vector_store = get_vector_store()  # Load FAISS (cached)
-embedding = embeddings.embed_query(state["search_query"])
-# "technology stack Python Snowflake" → [0.12, -0.45, ...]
-
-semantic_docs = vector_store.similarity_search_by_vector(embedding, k=5)
-# Find 5 most similar chunks
-# Result: chunks about data platforms with Python + Snowflake
+semantic_docs = vector_store.similarity_search(
+    state["search_query"],
+    k=8,
+    filter=lambda metadata: is_matching_summary_chunk(metadata, allowed_ids),
+    fetch_k=vector_store.index.ntotal,  # rank every chunk before filtering
+)
+# The query is embedded with the same model, compared with every chunk vector,
+# and only summary chunks of matching projects are kept
 
 state["semantic_documents"] = semantic_docs
 
 # keyword_retrieve:
 bm25 = get_keyword_retriever()  # Load BM25 (cached)
-keyword_docs = bm25.invoke(state["search_query"])
-# BM25 tokenizes: ["technology", "stack", "python", "snowflake"]
-# Finds chunks with these keywords
-# Result: chunks explicitly mentioning "Python" and "Snowflake"
+scores = bm25.vectorizer.get_scores(bm25.preprocess_func(state["search_query"]))
+# BM25 tokenizes: ["technology", "stack", "python", "snowflake"] and scores all chunks
+keyword_docs = [doc for _, doc in sorted(zip(scores, bm25.docs), key=lambda p: p[0], reverse=True)
+                if is_matching_summary_chunk(doc.metadata, allowed_ids)][:8]
+# Without conditions it is simply: bm25.invoke(state["search_query"])  (top 5)
 
 state["keyword_documents"] = keyword_docs
 
@@ -1480,20 +1484,19 @@ for doc in keyword_docs:
 documents = list(merged.values())
 # Sorted so "both" comes first
 
-# Apply metadata filters
+# Keep the full list of matching projects for the prompt
+matching_projects = []
 if state["metadata_filters"]:
     projects_db = get_project_metadata()  # Load from SQLite (cached)
-    
+
     matching_projects = filter_projects_by_metadata(
         state["metadata_filters"],
         projects_db
     )
     # Compares: technologies in ["Python", "Snowflake"], match="all"
     # Result: 17 projects that use BOTH
-    
-    matching_ids = {p["project_id"] for p in matching_projects}
-    documents = [d for d in documents if d.metadata["project_id"] in matching_ids]
-    # Drop chunks from non-matching projects
+    # No chunks need to be dropped here: the retrievers already searched
+    # only the matching projects' summary chunks
 
 state.update({
     "documents": documents,
@@ -1507,27 +1510,23 @@ context = format_context(state)
 # - PROJECTS MATCHING METADATA FILTERS (17 projects)
 # - RETRIEVED PROJECT TEXT (chunks)
 
-answer_prompt = ANSWER_PROMPT.format(
-    question=state["question"],
-    context=context,
-    feedback_note=""  # Empty on first pass
-)
-
-llm = get_llm()
-answer = llm.invoke(answer_prompt)
-# Groq reads prompt and generates answer
+chain = ANSWER_PROMPT | get_llm() | StrOutputParser()   # prompts live in graph/prompts.py
+answer = chain.invoke({
+    "question": state["question"],
+    "context": context,
+    "feedback_note": "",  # Empty on first pass
+})
+# Groq reads prompt and generates answer; StrOutputParser returns plain text
 
 state["answer"] = answer
 
 # STEP 7: verify_answer
-verification_prompt = VERIFICATION_PROMPT.format(
-    question=state["question"],
-    answer=state["answer"],
-    context=context
-)
-
-verifier = llm.with_structured_output(VerificationResult)
-result = verifier.invoke(verification_prompt)
+result = invoke_structured(VERIFICATION_PROMPT, VerificationResult, {
+    "question": state["question"],
+    "answer": state["answer"],
+    "context": context,
+})
+# Strict JSON-schema mode first; plain JSON mode fallback if Groq rejects the reply
 # Groq returns: {
 #   "is_valid": true,
 #   "feedback": "All 17 projects matched, names correct..."
@@ -1776,30 +1775,28 @@ Streamlit (ui/app.py)
   │   │       └─ compile()
   │   └─ graph.invoke({"question": ...})
   │       ├─ analyze_query(state)
-  │       │   ├─ QUERY_ANALYSIS_PROMPT | get_llm() | StrOutputParser
+  │       │   ├─ invoke_structured(QUERY_ANALYSIS_PROMPT, QueryAnalysis, ...)
   │       │   └─ build_metadata_filters(analysis, question, get_technology_names())
   │       ├─ semantic_retrieve(state) [PARALLEL]
   │       │   ├─ get_vector_store()
-  │       │   └─ similarity_search(search_query, k=5)
+  │       │   └─ similarity_search(search_query, k=5)  (k=8 + filter when conditions exist)
   │       ├─ keyword_retrieve(state) [PARALLEL]
   │       │   ├─ get_keyword_retriever()
-  │       │   └─ invoke(search_query)
+  │       │   └─ invoke(search_query)  (score all + filter, up to 8, when conditions exist)
   │       ├─ merge_documents(state)
-  │       │   ├─ De-duplicate by chunk_id
-  │       │   ├─ filter_projects_by_metadata(filters, get_project_metadata())
-  │       │   └─ Filter documents
+  │       │   ├─ De-duplicate by chunk_id, tag semantic / keyword / both
+  │       │   └─ filter_projects_by_metadata(filters, get_project_metadata()) → full match list
   │       ├─ generate_answer(state)
   │       │   ├─ format_context(state)
-  │       │   ├─ ANSWER_PROMPT.format(...)
-  │       │   └─ get_llm().invoke(prompt)
+  │       │   └─ (ANSWER_PROMPT | get_llm() | StrOutputParser()).invoke(...)
   │       ├─ verify_answer(state)
-  │       │   ├─ VERIFICATION_PROMPT.format(...)
-  │       │   └─ get_llm().with_structured_output(VerificationResult).invoke(...)
+  │       │   └─ invoke_structured(VERIFICATION_PROMPT, VerificationResult, ...)
   │       ├─ check_verification(state) [ROUTING]
   │       │   └─ return "end" or "retry"
   │       └─ [Optional] refine_query(state)
-  │           ├─ REFINE_QUERY_PROMPT.format(...)
-  │           └─ get_llm().invoke(prompt)
+  │           └─ (REFINE_QUERY_PROMPT | get_llm() | StrOutputParser()).invoke(...)
+  │
+  │   (all prompts are defined in graph/prompts.py)
   │
   └─ show_result(result)
       ├─ st.markdown(answer)
