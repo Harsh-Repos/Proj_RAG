@@ -1,0 +1,20 @@
+# Secrets
+.env
+
+# Virtual environment
+myvenv/
+.venv/
+venv/
+
+# Generated indexes (rebuild with: python ingestion/build_index.py)
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
