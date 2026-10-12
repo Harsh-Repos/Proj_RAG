@@ -7,7 +7,10 @@ from langchain_core.documents import Document
 
 class RAGState(TypedDict):
     question: str                       # original user question (never modified)
-    search_query: str                   # retrieval-friendly query (refined on retry)
+    use_cache: bool                     # optional input; False skips the answer cache (used by evaluation)
+    cache_hit: bool                     # True when the answer came from the answer cache
+
+    search_query: str                   # rewritten, retrieval-friendly query (refined on retry)
     metadata_filters: dict              # structured conditions found in the question
 
     semantic_documents: list[Document]  # FAISS results

@@ -1,0 +1,137 @@
+id,category,question,answer,faithfulness,correctness,precision,recall,f1,context_precision,context_recall,latency_seconds,verified,retries,faithfulness_reason,correctness_reason,error
+Q01,fact_lookup,What is the team size and duration of P057?,"- **Team Size:** 3 people  
+- **Duration:** 3 months (Project P057)",1.0,1.0,,,,0.1111111111111111,1.0,10.561649799987208,True,0,Unsupported: none,"correct: The answer correctly states the team size as 3 people and the duration as 3 months, matching the reference.",
+Q02,fact_lookup,What is the team size and duration of P012?,"- **Team Size:** 7 people  
+- **Duration:** 6 months (Project P012)",1.0,1.0,,,,0.1111111111111111,1.0,44.102791299985256,True,0,Unsupported: none,"correct: The answer correctly states the team size as 7 and the duration as 6 months, matching the reference.",
+Q03,fact_lookup,What is the team size and duration of P051?,"- **Team Size:** 2 people  
+- **Duration:** 5 weeks",1.0,1.0,,,,0.14285714285714285,1.0,37.898981900012586,True,0,Unsupported: none,"correct: The answer correctly states the team size as 2 people and the duration as 5 weeks, matching the reference.",
+Q04,fact_lookup,What is the team size and duration of P090?,"- Team Size: 6 people  
+- Duration: 7 months",1.0,1.0,,,,0.125,1.0,41.85686929995427,True,0,Unsupported: none,"correct: The answer correctly states a team size of 6 people and a duration of 7 months, matching the reference.",
+Q05,fact_lookup,What is the team size and duration of P033?,"- **Team Size:** 2 people  
+- **Duration:** 6 weeks",1.0,1.0,,,,0.125,1.0,45.942116799997166,True,0,Unsupported: none,"correct: The answer correctly states the team size as 2 people and the duration as 6 weeks, matching the reference.",
+Q06,technology_stack,What technologies are used in P038?,"- GCP Dataplex  
+- BigQuery  
+- dbt  
+- Apache Kafka  
+- Terraform  
+- Python",1.0,1.0,,,,0.14285714285714285,1.0,40.96317239996279,True,0,Unsupported: none,correct: The answer lists exactly the same technologies as the reference.,
+Q07,technology_stack,What technologies are used in P005?,"- OpenAI GPT‑4  
+- LangChain  
+- FAISS  
+- Python  
+- Azure Blob Storage  
+- Streamlit",1.0,1.0,,,,0.125,1.0,42.69548179995036,True,0,Unsupported: none,correct: The answer includes all the technologies listed in the reference answer with no contradictions.,
+Q08,technology_stack,What technologies are used in P025?,"- Azure Data Lake Gen2  
+- Databricks  
+- Delta Lake  
+- Apache Spark  
+- dbt  
+- Terraform",1.0,1.0,,,,0.125,1.0,48.84657979995245,True,0,Unsupported: none,correct: The answer lists exactly the same technologies as the reference.,
+Q09,section_lookup,What is the solution approach of P090?,"**Solution Approach (P090 – Multi-Source Data Integration Platform)**  
+- Implement a **FHIR R4‑compliant data integration layer** that normalizes records from the 15 source EMR systems.  
+- Build a **master patient index** using probabilistic matching to link patient records across systems.  
+- Include an **HL7 v2 to FHIR converter** to translate incoming data into the unified FHIR format.",1.0,1.0,,,,0.125,1.0,50.0455308999517,True,0,Unsupported: none,"correct: The answer includes all three key facts from the reference: a FHIR R4‑compliant integration layer normalizing 15 sources, a master patient index with probabilistic matching, and an HL7 v2 to FHIR converter.",
+Q10,section_lookup,What is the problem statement of P001?,"**Problem Statement for P001 – Customer Churn Prediction Engine**
+
+High customer attrition rate (18% annually) with no early‑warning system, resulting in $12 M annual revenue loss.",1.0,1.0,,,,0.1111111111111111,1.0,47.22803510003723,True,0,Unsupported: none,correct: The answer repeats the reference's problem statement exactly with no contradictions.,
+Q11,section_lookup,What is the solution approach of P045?,"**Solution Approach for P045 – Enterprise Knowledge Base with RAG**
+
+- Implement a Retrieval‑Augmented Generation (RAG) system that indexes 10K+ internal documents (wikis, SOPs, tickets).  
+- Use semantic chunking with a parent‑child retrieval structure.  
+- Apply confidence scoring to the retrieved results and route low‑confidence cases to human escalation.",1.0,1.0,,,,0.14285714285714285,1.0,46.12916780001251,True,0,Unsupported: none,"correct: The answer includes all key facts from the reference: indexing 10K+ internal documents, semantic chunking with parent‑child retrieval, confidence scoring, and human escalation.",
+Q12,semantic_search,Which project predicts which customers are likely to stop using a service?,"- **P001 – Customer Churn Prediction Engine** – predicts which customers are likely to stop using the service (i.e., churn).",1.0,1.0,1.0,1.0,1.0,0.2,1.0,34.08747600001516,True,0,Unsupported: none,correct: The answer correctly identifies P001 - Customer Churn Prediction Engine as the project predicting customer churn.,
+Q13,semantic_search,Which project built a chatbot that answers employee questions about HR policies?,"- **Project ID:** P011  
+- **Project Name:** LLM‑Powered HR Policy Chatbot  
+- **Solution Approach:** RAG‑based chatbot using GPT‑3.5‑turbo over internal HR policy documents, integrated with Slack and MS Teams, with escalation routing to HR agents for complex queries.  
+- **Technology Stack:** OpenAI GPT‑3.5, LangChain, Pinecone, Python, Slack SDK, MS Teams API.  
+- **Expected Outcomes:** Deflected 78 % of HR queries; average response time reduced from 48 hours to < 30 seconds; 4.6/5 employee satisfaction.",1.0,1.0,1.0,1.0,1.0,0.2,1.0,7.845175999915227,True,0,Unsupported: none,"correct: The answer correctly identifies project P011 as the LLM‑Powered HR Policy Chatbot, matching the reference.",
+Q14,semantic_search,Which project lets business users ask questions in plain English and turns them into SQL?,"**Project P061 — Text-to-SQL Analytics Assistant**  
+- **Type:** NLP / GenAI  
+- **Domain:** Enterprise / Analytics  
+- **Team Size:** 2 people  
+- **Duration:** 6 weeks  
+- **Technology Stack:** OpenAI GPT‑4 · Python · Snowflake · FastAPI · React · LangChain  
+- **Problem Statement:** Business analysts blocked on data‑team queue (5‑day wait) for SQL queries, slowing time‑to‑insight across 12 business units.  
+- **Solution Approach:** LLM‑based text‑to‑SQL system using schema‑aware prompting, with a query‑validation layer to prevent dangerous mutations and a self‑correcting mechanism for failed queries.  
+- **Expected Outcomes:** 80% of analytical queries now self‑served; data‑team queue reduced by 70%; business analyst productivity + 4 hours/week.",1.0,1.0,1.0,1.0,1.0,0.125,1.0,50.72947039990686,True,0,Unsupported: none,"correct: The answer correctly identifies project P061 – Text-to-SQL Analytics Assistant, matching the reference.",
+Q15,metadata_filter,Which projects have a team size less than 5 and a duration less than 3 months?,"- P002 – NLP‑Powered Contract Review System  
+- P008 – Automated Data Quality Framework  
+- P009 – Multi‑Language Sentiment Analysis Platform  
+- P010 – Cloud Cost Optimization Intelligence  
+- P011 – LLM‑Powered HR Policy Chatbot  
+- P014 – Automated Code Review Assistant  
+- P016 – NLP‑Based Resume Screening System  
+- P019 – Social Media Analytics Pipeline  
+- P026 – LLM‑Assisted Sales Proposal Generator  
+- P028 – Automated Compliance Document Extraction  
+- P030 – Warehouse Slotting Optimization  
+- P033 – Student Performance Prediction System  
+- P037 – Multi‑Modal Product Content Generation  
+- P040 – Voice‑of‑Customer Analytics Platform  
+- P042 – Automated Algorithmic Trading Backtester  
+- P045 – Enterprise Knowledge Base with RAG  
+- P048 – Automated Invoice Processing  
+- P050 – Customer Lifetime Value Prediction  
+- P051 – AI‑Powered Meeting Summarization Tool  
+- P056 – Legal Case Outcome Prediction  
+- P060 – Revenue Operations Data Platform  
+- P061 – Text‑to‑SQL Analytics Assistant  
+- P066 – Seismic Event Classification System  
+- P067 – Customer Segmentation & Personalization Engine  
+- P069 – Synthetic Data Generation for Model Training  
+- P070 – Intelligent Incident Management System  
+- P073 – Conversational Commerce Platform  
+- P077 – B2B Lead Scoring & Intent Prediction  
+- P078 – Document Redaction & PII Masking Pipeline  
+- P079 – HR Attrition Risk Analytics  
+- P082 – Real‑Time Translation for Global Support  
+- P086 – NLP Pipeline for Earnings Call Analysis  
+- P088 – AI‑Driven Market Research Synthesis  
+- P094 – Predictive Spare Parts Inventory  
+- P097 – Automated ESG Scoring for Investment Portfolio",1.0,1.0,1.0,1.0,1.0,1.0,1.0,39.685998799977824,True,0,Unsupported: none,correct: The answer includes all 35 projects listed in the reference answer with no contradictions.,
+Q16,metadata_filter,Which projects use Python and Snowflake?,"- **P008** – Automated Data Quality Framework  
+- **P010** – Cloud Cost Optimization Intelligence  
+- **P015** – Customer 360 Data Platform  
+- **P021** – Automated Financial Reporting Pipeline  
+- **P027** – Inventory Demand Forecasting at SKU Level  
+- **P036** – Real‑Time Pricing Engine for E‑Commerce  
+- **P049** – Data Governance & Catalog Platform  
+- **P050** – Customer Lifetime Value Prediction  
+- **P052** – Carbon Emissions Monitoring Platform  
+- **P057** – Automated A/B Testing Platform  
+- **P058** – Intelligent Procurement Analytics  
+- **P061** – Text‑to‑SQL Analytics Assistant  
+- **P067** – Customer Segmentation & Personalization Engine  
+- **P077** – B2B Lead Scoring & Intent Prediction  
+- **P079** – HR Attrition Risk Analytics  
+- **P092** – Supply Chain Risk Intelligence Platform  
+- **P097** – Automated ESG Scoring for Investment Portfolio",1.0,1.0,1.0,1.0,1.0,1.0,1.0,19.781011700000022,True,0,Unsupported: none,"correct: The answer includes all 17 projects listed in the reference answer with matching identifiers and titles, and no contradictory information.",
+Q17,metadata_filter,Which NLP / GenAI projects have a team size of at least 5?,"- **P022** – Conversational AI for Banking Support (team size: 5 people)  
+- **P034** – Knowledge Graph for Enterprise Search (team size: 5 people)",1.0,1.0,1.0,1.0,1.0,1.0,1.0,29.267906100000005,True,0,Unsupported: none,"correct: The answer includes both P022 and P034 with team sizes of at least 5, matching the reference.",
+Q18,metadata_filter,Which Data Engineering projects last longer than 6 months?,"- **P025** – Data Lakehouse Migration (On-Prem to Cloud) – Duration: 7 months  
+- **P038** – Data Mesh Implementation for Telco – Duration: 9 months  
+- **P041** – Blockchain-Backed Supply Chain Traceability – Duration: 7 months  
+- **P090** – Multi-Source Data Integration Platform – Duration: 7 months",1.0,1.0,1.0,1.0,1.0,1.0,1.0,41.489836999999966,True,0,Unsupported: none,correct: The answer includes all four projects listed in the reference with matching durations and no contradictions.,
+Q19,metadata_filter,List the projects with a team size of more than 6 people.,"- **P012** – Real-Time Fraud Detection for Payments  
+- **P025** – Data Lakehouse Migration (On-Prem to Cloud)  
+- **P038** – Data Mesh Implementation for Telco",1.0,1.0,1.0,1.0,1.0,1.0,1.0,35.23132360000011,True,0,Unsupported: none,"correct: The answer lists exactly the three projects (P012, P025, P038) with the same descriptions as the reference.",
+Q20,typo_filter,which projcts use pythn and snowflak,"- P008  
+- P010  
+- P015  
+- P021  
+- P027  
+- P036  
+- P049  
+- P050  
+- P052  
+- P057  
+- P058  
+- P061  
+- P067  
+- P077  
+- P079  
+- P092  
+- P097",1.0,1.0,1.0,1.0,1.0,1.0,1.0,67.22232159999999,True,0,Unsupported: none,"correct: The answer lists exactly the same 17 project IDs as the reference answer, with no missing or contradictory information.",
+Q21,out_of_scope,What is the weather in Delhi today?,"This question is not related to the project repository, so I can't answer it. I can only answer questions about the projects in our knowledge base, such as their technologies, team size, duration, domain, solution approach or outcomes.",1.0,1.0,1.0,1.0,1.0,,,40.55375209997874,True,0,"Fixed reply, no claims to check.",Expected fixed reply given.,
+Q22,out_of_scope,What is Apache Kafka in general?,"This question is not related to the project repository, so I can't answer it. I can only answer questions about the projects in our knowledge base, such as their technologies, team size, duration, domain, solution approach or outcomes.",1.0,1.0,1.0,1.0,1.0,,,38.3997292999411,True,0,"Fixed reply, no claims to check.",Expected fixed reply given.,
+Q23,not_in_documents,Who was the project manager of P038?,I don't know based on the provided project repository.,1.0,1.0,1.0,1.0,1.0,,,40.70516539993696,True,0,"Fixed reply, no claims to check.",Expected fixed reply given.,

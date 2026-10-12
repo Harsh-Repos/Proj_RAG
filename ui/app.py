@@ -14,6 +14,7 @@ import streamlit as st
 # Allow "streamlit run ui/app.py" to import the project packages.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from graph.answer_cache import clear_answer_cache  # noqa: E402
 from graph.metadata_filters import describe_filters  # noqa: E402
 from graph.nodes import (  # noqa: E402
     get_keyword_retriever,
@@ -73,6 +74,9 @@ def show_result(result: dict) -> None:
         return
     st.markdown(escape_markdown(result["answer"]))
 
+    if result.get("cache_hit"):
+        st.caption("⚡ Answered from the answer cache (this question was verified earlier).")
+
     retry_note = " after 1 retry" if result["retry_count"] else ""
     if result["is_valid"]:
         st.caption(f"✅ Verified{retry_note}: {result['verification_feedback']}")
@@ -105,8 +109,21 @@ def show_result(result: dict) -> None:
             )
 
     with st.expander("Retrieval details"):
-        st.write(f"**Search query:** {result['search_query']}")
+        st.write(f"**Rewritten search query:** {result['search_query']}")
         st.write(f"**Retries used:** {result['retry_count']}")
+        st.write(f"**From answer cache:** {'yes' if result.get('cache_hit') else 'no'}")
+
+
+def start_answering() -> None:
+    """Ask-button callback: remember the question and lock the input until it is answered.
+
+    Without the lock, clicking Ask again while an answer is being generated starts a second
+    question in parallel; both then compete for Groq's tokens-per-minute limit (HTTP 429).
+    """
+    question = st.session_state.question_input.strip()
+    if question:
+        st.session_state.pending_question = question
+        st.session_state.is_answering = True
 
 
 def main() -> None:
@@ -121,15 +138,33 @@ def main() -> None:
 
     graph = load_rag_graph()
 
-    question = st.text_input("Ask a question about the project repository")
-    if st.button("Ask", type="primary") and question.strip():
-        with st.spinner("Retrieving, answering and verifying..."):
+    st.session_state.setdefault("is_answering", False)
+    is_answering = st.session_state.is_answering
+
+    if st.sidebar.button("Clear answer cache", disabled=is_answering):
+        clear_answer_cache()
+        st.sidebar.success("Answer cache cleared.")
+
+    st.text_input("Ask a question about the project repository", key="question_input", disabled=is_answering)
+    st.button("Ask", type="primary", on_click=start_answering, disabled=is_answering)
+
+    if is_answering:
+        with st.spinner("Retrieving, answering and verifying... (Ask is locked until this answer is ready)"):
             try:
-                result = graph.invoke({"question": question.strip()}, config={"run_name": RUN_NAME})
+                st.session_state.last_result = graph.invoke(
+                    {"question": st.session_state.pending_question}, config={"run_name": RUN_NAME}
+                )
+                st.session_state.last_error = None
             except Exception as error:  # show API errors (e.g. rate limits) instead of a stack trace
-                st.error(f"Something went wrong: {error}")
-                st.stop()
-        show_result(result)
+                st.session_state.last_result = None
+                st.session_state.last_error = str(error)
+        st.session_state.is_answering = False
+        st.rerun()  # redraw with the input unlocked and the new answer
+
+    if st.session_state.get("last_error"):
+        st.error(f"Something went wrong: {st.session_state.last_error}")
+    elif st.session_state.get("last_result"):
+        show_result(st.session_state.last_result)
 
 
 main()

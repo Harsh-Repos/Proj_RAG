@@ -14,6 +14,7 @@ from pathlib import Path
 # Allow "python ingestion/build_index.py" to import the ingestion package.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from graph.answer_cache import clear_answer_cache  # noqa: E402
 from ingestion.database import DATABASE_PATH, create_database, insert_projects  # noqa: E402
 from ingestion.document_loader import load_pdf, group_pages_by_project  # noqa: E402
 from ingestion.embeddings import get_embedding_model  # noqa: E402
@@ -34,12 +35,13 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def remove_existing_indexes() -> None:
-    """Delete previously built indexes (only called with --rebuild)."""
+    """Delete previously built indexes and the cached answers built from them (only with --rebuild)."""
     for path in INDEX_PATHS:
         if path.is_dir():
             shutil.rmtree(path)
         elif path.exists():
             path.unlink()
+    clear_answer_cache()
 
 
 def parse_projects() -> tuple[list[dict], list]:

@@ -1,7 +1,7 @@
 """LangGraph nodes for the controlled Hybrid RAG workflow.
 
-LLM calls happen only in: analyze_query, generate_answer, verify_answer, refine_query.
-The retrieval and merge nodes are deterministic.
+LLM calls happen only in: rewrite_query, analyze_query, generate_answer, verify_answer,
+refine_query. The cache, retrieval and merge nodes are deterministic.
 """
 
 import json
@@ -15,6 +15,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
+from graph.answer_cache import load_cached_answer, save_answer_to_cache
 from graph.llm import get_llm
 from graph.metadata_filters import (
     PROJECT_ID_PATTERN,
@@ -28,6 +29,7 @@ from graph.prompts import (
     JSON_FALLBACK_INSTRUCTION,
     QUERY_ANALYSIS_PROMPT,
     REFINE_QUERY_PROMPT,
+    REWRITE_QUERY_PROMPT,
     VERIFICATION_PROMPT,
 )
 from graph.state import RAGState
@@ -160,17 +162,32 @@ def format_context(state: RAGState) -> str:
 # Nodes
 # ---------------------------------------------------------------------------
 
+def check_cache(state: RAGState) -> dict:
+    """Return a previously verified answer for the same question, if there is one."""
+    cached = load_cached_answer(state["question"]) if state.get("use_cache", True) else None
+    if cached is None:
+        return {"cache_hit": False}
+    return {**cached, "cache_hit": True}
+
+
+def rewrite_query(state: RAGState) -> dict:
+    """Query rewriter: one LLM call that turns the user's question into a clean search query
+    (spelling fixed, abbreviations expanded, field names added). Project IDs are guaranteed
+    to survive the rewrite."""
+    question = state["question"]
+    chain = REWRITE_QUERY_PROMPT | get_llm() | StrOutputParser()
+    rewritten = clean_single_line(chain.invoke({"question": question})) or question
+    return {"search_query": keep_project_ids(rewritten, question)}
+
+
 def analyze_query(state: RAGState) -> dict:
-    """One LLM call that (a) rewrites the question for retrieval and (b) extracts its
-    conditions into a fixed schema. The LLM only understands the wording; the numeric
-    comparison happens later in Python (merge_documents)."""
+    """One LLM call that extracts the question's conditions into a fixed schema. The LLM only
+    understands the wording; the numeric comparison happens later in Python."""
     question = state["question"]
     # Tool-calling mode failed with HTTP 400 on off-topic questions, so JSON modes are used.
     analysis = invoke_structured(QUERY_ANALYSIS_PROMPT, QueryAnalysis, {"question": question})
-    search_query = clean_single_line(analysis.search_query) or question
 
     return {
-        "search_query": keep_project_ids(search_query, question),
         "metadata_filters": build_metadata_filters(analysis, question, get_technology_names()),
         "retry_count": 0,
     }
@@ -242,6 +259,9 @@ def merge_documents(state: RAGState) -> dict:
     matches: list[dict] = []
     if filters:
         matches = filter_projects_by_metadata(filters, get_project_metadata())
+        # FAISS and BM25 may each pick 8 different projects; keep 8 in total so the prompt
+        # stays under Groq's per-request token limit. The full match list is still sent.
+        documents = documents[:MAX_FILTERED_PROJECTS]
 
     return {"documents": documents, "metadata_matches": matches}
 
@@ -284,3 +304,10 @@ def refine_query(state: RAGState) -> dict:
         "search_query": keep_project_ids(refined, state["question"]),
         "retry_count": state["retry_count"] + 1,
     }
+
+
+def save_to_cache(state: RAGState) -> dict:
+    """Remember the answer for next time, but only if it passed verification."""
+    if state.get("use_cache", True) and state["is_valid"]:
+        save_answer_to_cache(state["question"], state)
+    return {}

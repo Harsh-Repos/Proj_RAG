@@ -1,0 +1,106 @@
+{
+  "questions": 23,
+  "errors": 0,
+  "verified_rate": 1.0,
+  "retry_rate": 0.0,
+  "overall": {
+    "faithfulness": 1.0,
+    "correctness": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "context_precision": 0.396,
+    "context_recall": 1.0,
+    "latency_seconds": 39.186
+  },
+  "by_category": {
+    "fact_lookup": {
+      "questions": 5,
+      "faithfulness": 1.0,
+      "correctness": 1.0,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "context_precision": 0.123,
+      "context_recall": 1.0,
+      "latency_seconds": 36.072
+    },
+    "technology_stack": {
+      "questions": 3,
+      "faithfulness": 1.0,
+      "correctness": 1.0,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "context_precision": 0.131,
+      "context_recall": 1.0,
+      "latency_seconds": 44.168
+    },
+    "section_lookup": {
+      "questions": 3,
+      "faithfulness": 1.0,
+      "correctness": 1.0,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "context_precision": 0.126,
+      "context_recall": 1.0,
+      "latency_seconds": 47.801
+    },
+    "semantic_search": {
+      "questions": 3,
+      "faithfulness": 1.0,
+      "correctness": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "context_precision": 0.175,
+      "context_recall": 1.0,
+      "latency_seconds": 30.887
+    },
+    "metadata_filter": {
+      "questions": 5,
+      "faithfulness": 1.0,
+      "correctness": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "context_precision": 1.0,
+      "context_recall": 1.0,
+      "latency_seconds": 33.091
+    },
+    "typo_filter": {
+      "questions": 1,
+      "faithfulness": 1.0,
+      "correctness": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "context_precision": 1.0,
+      "context_recall": 1.0,
+      "latency_seconds": 67.222
+    },
+    "out_of_scope": {
+      "questions": 2,
+      "faithfulness": 1.0,
+      "correctness": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "context_precision": null,
+      "context_recall": null,
+      "latency_seconds": 39.477
+    },
+    "not_in_documents": {
+      "questions": 1,
+      "faithfulness": 1.0,
+      "correctness": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "context_precision": null,
+      "context_recall": null,
+      "latency_seconds": 40.705
+    }
+  }
+}

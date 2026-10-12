@@ -47,14 +47,13 @@ class DurationCondition(BaseModel):
 
 
 class QueryAnalysis(BaseModel):
-    """Retrieval query plus the explicit conditions stated in the question.
+    """The explicit conditions stated in the question.
 
     Every field is required (null when not applicable) because Groq's strict
     JSON-schema mode needs that, and strict mode guarantees a valid reply even
     for odd questions (the default tool-calling mode can fail with HTTP 400).
     """
 
-    search_query: str = Field(description="Retrieval-friendly rewrite of the question, on one line")
     team_size: TeamSizeCondition | None = Field(description="Only if the question states a team size condition")
     duration: DurationCondition | None = Field(description="Only if the question states a duration condition")
     project_types: list[Literal["ML/AI", "NLP / GenAI", "Data Engineering"]] | None = Field(
@@ -91,6 +90,16 @@ def match_technology_name(term: str, technology_names: list[str]) -> str:
     return by_lower[close[0]] if close else term
 
 
+def choose_technology_match(llm_choice: str | None, question: str) -> str:
+    """'any' only if the LLM says so AND the question really says "or" / "either" / "any of".
+
+    Otherwise every technology is required ("Python and Snowflake" -> all). This guards
+    against the LLM reading "and" as "or", which turns 17 matches into 97.
+    """
+    says_any = re.search(r"\b(or|either|any of)\b", question, re.IGNORECASE) is not None
+    return "any" if llm_choice == "any" and says_any else "all"
+
+
 def build_metadata_filters(analysis: QueryAnalysis, question: str, technology_names: list[str]) -> dict:
     """Convert the LLM's QueryAnalysis into validated filters for Python comparison.
 
@@ -121,7 +130,7 @@ def build_metadata_filters(analysis: QueryAnalysis, question: str, technology_na
     })
     if technologies:
         filters["technologies"] = technologies
-        filters["technology_match"] = analysis.technology_match or "all"
+        filters["technology_match"] = choose_technology_match(analysis.technology_match, question)
 
     return filters
 

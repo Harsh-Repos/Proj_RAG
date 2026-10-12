@@ -17,6 +17,16 @@ Each project's first page has a fixed layout:
 
 Metadata is read only from this page. The "Technical Deep Dive" page drops units
 (e.g. "9 / Duration") and sometimes splits words, so it is not used for metadata.
+
+Why these fields: every project's PROJECT DETAILS block has exactly the same fields, and they
+are what users filter and ask by.
+  project_id, project_name   identify and cite the project; BM25 matches exact IDs
+  type, domain               filter by category ("Data Engineering projects")
+  team_size                  numeric filter ("team size at least 5"), stored as int
+  duration                   original text, shown to the user ("3 months")
+  duration_weeks             duration in one unit, so "10 weeks" and "3 months" compare as numbers
+  technology_stack           technology filter ("uses Python and Snowflake"), stored as a list
+  pages                      source pages, for citations
 """
 
 import re

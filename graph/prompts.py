@@ -16,30 +16,50 @@ REPOSITORY_DESCRIPTION = (
     "Key Metrics & Business Impact."
 )
 
-# Used by analyze_query: rewrites the question for retrieval and extracts its conditions.
+# Used by rewrite_query (query rewriter): turns the user's question into a clean search query.
+REWRITE_QUERY_PROMPT = ChatPromptTemplate.from_messages([
+    ("system",
+     "You rewrite a user's question about a project repository into one search query for a "
+     "hybrid retriever (semantic FAISS + keyword BM25).\n"
+     f"{REPOSITORY_DESCRIPTION}\n\n"
+     "Rules:\n"
+     "- Fix spelling mistakes (e.g. 'technolgies' -> 'technologies', 'pythn' -> 'Python').\n"
+     "- Expand informal words and abbreviations (e.g. 'ppl' -> 'people', 'gen ai' -> "
+     "'generative AI', 'ML' -> 'machine learning').\n"
+     "- Keep every project ID, project name, technology, number, unit and comparison exactly.\n"
+     "- Add only the field or section names the question actually asks about (e.g. "
+     "'technology stack', 'team size', 'duration', 'solution approach', 'problem statement', "
+     "'expected outcomes'). Never add fields the question does not mention.\n"
+     "- Keep the query short: about the length of the question.\n"
+     "- Do not answer the question and do not add facts that are not in it.\n"
+     "- If the question is unrelated to the repository (e.g. weather, news), return it unchanged.\n"
+     "- Return only the rewritten query on a single line."),
+    ("human", "{question}"),
+])
+
+# Used by analyze_query: extracts the question's conditions (team size, duration, type, technologies).
 QUERY_ANALYSIS_PROMPT = ChatPromptTemplate.from_messages([
     ("system",
-     "You analyze a user's question about a project repository.\n"
+     "You extract the explicit conditions from a user's question about a project repository.\n"
      f"{REPOSITORY_DESCRIPTION}\n\n"
-     "Return two things:\n"
-     "1. search_query: one line for a hybrid retriever (semantic FAISS + keyword BM25). "
-     "Keep every project ID, project name, technology, number, unit and condition. Add the "
-     "relevant field/section names (e.g. 'technology stack', 'team size', 'duration', "
-     "'solution approach'). Fix obvious spelling mistakes. Do not answer the question.\n"
-     "2. The explicit conditions the projects must satisfy (team_size, duration, "
-     "project_types, technologies).\n\n"
+     "Return the conditions the projects must satisfy (team_size, duration, project_types, "
+     "technologies). Do not answer the question.\n\n"
      "Rules for conditions:\n"
      "- Users make typos and use informal wording: understand the meaning. "
      "'atleast 5' = >= 5, 'more then 3 months' = > 3 months, '5+ members' = >= 5, "
      "'max 4 people' = <= 4, 'a quarter' = 3 months, 'half a year' = 6 months.\n"
      "- Only fill a condition the question actually states. Never invent conditions.\n"
+     "- If a duration has no unit (e.g. 'duration of 6'), use months.\n"
      "- Leave all conditions empty if the question is about specific project IDs (e.g. P038).\n"
      "- project_types: only when the question restricts the category "
      "(e.g. 'GenAI projects' -> NLP / GenAI, 'machine learning projects' -> ML/AI).\n"
      "- technologies: only specific named tools, languages or platforms (e.g. Python, "
      "Snowflake, Kafka), with spelling corrected. Not generic words like 'AI' or 'cloud'.\n"
-     "- If the question is unrelated to the repository (e.g. weather, news), set search_query "
-     "to the question as written and leave every condition null."),
+     "- technology_match: 'all' when the technologies are joined by 'and', commas or simply "
+     "listed ('use Python and Snowflake' = all). 'any' ONLY when the question says 'or', "
+     "'either' or 'any of' ('use Kafka or Spark' = any).\n"
+     "- If the question is unrelated to the repository (e.g. weather, news), leave every "
+     "condition null."),
     ("human", "{question}"),
 ])
 
@@ -97,8 +117,8 @@ ANSWER_PROMPT = ChatPromptTemplate.from_messages([
      "QUESTION: {question}"),
 ])
 
-# Appended to QUERY_ANALYSIS_PROMPT / VERIFICATION_PROMPT only when strict JSON-schema
-# output fails and the call is repeated in plain JSON mode.
+# Appended to a structured-output prompt (QUERY_ANALYSIS_PROMPT, VERIFICATION_PROMPT, evaluation
+# judges) only when strict JSON-schema output fails and the call is repeated in plain JSON mode.
 JSON_FALLBACK_INSTRUCTION = (
     "Respond with ONLY a JSON object (no reasoning, no other text) that matches this JSON schema:\n"
     "{json_schema}"
